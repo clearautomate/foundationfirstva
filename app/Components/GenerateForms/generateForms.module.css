@@ -1,0 +1,88 @@
+.container {
+    max-width: 720px;
+    margin: 0 auto;
+}
+
+.title {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 16px;
+}
+
+.card {
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    padding: 16px;
+    display: grid;
+    gap: 12px;
+}
+
+.fileGroup {
+    display: grid;
+    gap: 8px;
+}
+
+.label {
+    font-weight: 600;
+}
+
+.fileInput {
+    cursor: pointer;
+}
+
+.fileName {
+    color: #555;
+}
+
+.row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.field {
+    display: grid;
+    gap: 6px;
+}
+
+.select,
+.input {
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #ddd;
+}
+
+.error {
+    border: 1px solid #ffcccc;
+    background: #fff2f2;
+    color: #a40000;
+    border-radius: 10px;
+    padding: 10px 12px;
+}
+
+.actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.button,
+.secondaryButton {
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid #111;
+    font-weight: 700;
+    cursor: pointer;
+    background: white;
+}
+
+.secondaryButton {
+    border-color: #ddd;
+    font-weight: 600;
+}
+
+.button:disabled,
+.secondaryButton:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}

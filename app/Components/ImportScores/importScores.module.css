@@ -1,0 +1,140 @@
+.container {
+    max-width: 980px;
+    margin: 0 auto;
+}
+
+.title {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 16px;
+}
+
+.card {
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    padding: 16px;
+    display: grid;
+    gap: 12px;
+}
+
+.fileGroup {
+    display: grid;
+    gap: 8px;
+}
+
+.label {
+    font-weight: 600;
+}
+
+.fileInput {
+    cursor: pointer;
+}
+
+.fileName {
+    color: #555;
+}
+
+.error {
+    border: 1px solid #ffcccc;
+    background: #fff2f2;
+    color: #a40000;
+    border-radius: 10px;
+    padding: 10px 12px;
+}
+
+.actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+}
+
+.button,
+.secondaryButton {
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid #111;
+    font-weight: 700;
+    cursor: pointer;
+    background: white;
+}
+
+.secondaryButton {
+    border-color: #ddd;
+    font-weight: 600;
+}
+
+.button:disabled,
+.secondaryButton:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.tableCard {
+    margin-top: 14px;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    padding: 14px;
+    display: grid;
+    gap: 10px;
+}
+
+.tableTopRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.tableMeta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.metaPill {
+    border: 1px solid #ddd;
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-weight: 700;
+    font-size: 12px;
+}
+
+.metaHint {
+    color: #555;
+    font-size: 12px;
+}
+
+.tableWrap {
+    overflow: auto;
+    border-radius: 10px;
+    border: 1px solid #eee;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 840px;
+}
+
+.table thead th {
+    position: sticky;
+    top: 0;
+    background: #fafafa;
+    z-index: 1;
+    text-align: left;
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    border-bottom: 1px solid #ddd;
+    padding: 10px 12px;
+}
+
+.table tbody td {
+    border-bottom: 1px solid #eee;
+    padding: 10px 12px;
+    vertical-align: top;
+}
+
+.monoHint {
+    font-variant-numeric: tabular-nums;
+}
