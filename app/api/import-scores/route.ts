@@ -35,9 +35,7 @@ function isYellowFill(cell: ExcelJS.Cell) {
     const fg = (fill as any).fgColor?.argb as string | undefined;
     if (!fg) return false;
 
-    // Your generator uses fgColor argb "FFFFFF00"
     const hex = String(fg).toUpperCase();
-    // accept ...FFFF00 as “yellow”
     return hex.endsWith("FFFF00");
 }
 
@@ -49,6 +47,14 @@ function readNumericScore(cell: ExcelJS.Cell) {
         return Number.isFinite(n) ? n : null;
     }
     return null;
+}
+
+function clamp(n: number, min: number, max: number) {
+    return Math.max(min, Math.min(max, n));
+}
+
+function normName(s: string) {
+    return (s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 type ImportedRow = {
@@ -69,22 +75,82 @@ type ImportedRow = {
     coordinatorScorePercent: number | null;
 };
 
-function clamp(n: number, min: number, max: number) {
-    return Math.max(min, Math.min(max, n));
+type CombinedRow = {
+    // identity
+    jobTitle: string;
+    fiscalYear: string;
+    period: string;
+    firstName: string;
+    lastName: string;
+
+    // sources
+    employeeFileName: string | null;
+    coordinatorFileName: string | null;
+
+    // scores
+    employeeScorePercent: number | null;
+    coordinatorScorePercent: number | null;
+};
+
+function mergeRowsByName(rows: ImportedRow[]): CombinedRow[] {
+    // Keyed ONLY by first+last (as you requested).
+    // If you want safer grouping, include jobTitle/fiscalYear/period in the key.
+    const map = new Map<string, CombinedRow>();
+
+    for (const r of rows) {
+        const key = `${normName(r.firstName)}|${normName(r.lastName)}`;
+
+        const existing =
+            map.get(key) ??
+            ({
+                jobTitle: r.jobTitle,
+                fiscalYear: r.fiscalYear,
+                period: r.period,
+                firstName: r.firstName,
+                lastName: r.lastName,
+
+                employeeFileName: null,
+                coordinatorFileName: null,
+
+                employeeScorePercent: null,
+                coordinatorScorePercent: null,
+            } satisfies CombinedRow);
+
+        // Keep the first non-empty meta values (optional)
+        if (!existing.jobTitle && r.jobTitle) existing.jobTitle = r.jobTitle;
+        if (!existing.fiscalYear && r.fiscalYear) existing.fiscalYear = r.fiscalYear;
+        if (!existing.period && r.period) existing.period = r.period;
+        if (!existing.firstName && r.firstName) existing.firstName = r.firstName;
+        if (!existing.lastName && r.lastName) existing.lastName = r.lastName;
+
+        // Merge score into the right slot
+        if (r.completedBy === "Employee") {
+            // If duplicate employee file exists, last one wins (change if you want)
+            existing.employeeScorePercent = r.percent;
+            existing.employeeFileName = r.fileName;
+        } else if (r.completedBy === "Coordinator") {
+            existing.coordinatorScorePercent = r.percent;
+            existing.coordinatorFileName = r.fileName;
+        } else {
+            // Unknown: do nothing, or pick a side if you want
+        }
+
+        map.set(key, existing);
+    }
+
+    return Array.from(map.values());
 }
 
 export async function POST(req: Request) {
     try {
         const form = await req.formData();
         const files = form.getAll("files");
-
         const excelFiles = files.filter((f): f is File => f instanceof File);
 
         if (!excelFiles.length) {
             return NextResponse.json({ error: "Missing files" }, { status: 400 });
         }
 
-        // validate extensions
         const bad = excelFiles.find((f) => !f.name.toLowerCase().endsWith(".xlsx"));
         if (bad) {
             return NextResponse.json({ error: "All files must be .xlsx" }, { status: 400 });
@@ -100,11 +166,9 @@ export async function POST(req: Request) {
             // @ts-expect-error ExcelJS type defs are too narrow; Uint8Array works at runtime
             await wb.xlsx.load(inputBytes);
 
-            // Most generated forms have a single main sheet
             const ws = wb.worksheets?.[0];
             if (!ws) continue;
 
-            // From your generator layout (merged C:D but value lives in column C)
             const jobTitle = getCellText(ws, "C6");
             const fiscalYear = getCellText(ws, "C7");
             const period = getCellText(ws, "C8");
@@ -112,16 +176,12 @@ export async function POST(req: Request) {
             const firstName = getCellText(ws, "C10");
             const lastName = getCellText(ws, "C11");
 
-            // Collect numeric scores from yellow-filled cells (1-5)
             const scores: number[] = [];
             ws.eachRow((row) => {
                 row.eachCell((cell) => {
                     if (!isYellowFill(cell)) return;
-
                     const n = readNumericScore(cell);
                     if (n == null) return;
-
-                    // only keep likely KPI score values (1..5)
                     if (n >= 1 && n <= 5) scores.push(n);
                 });
             });
@@ -140,24 +200,23 @@ export async function POST(req: Request) {
 
             rows.push({
                 fileName: file.name,
-
                 jobTitle,
                 fiscalYear,
                 period,
                 firstName,
                 lastName,
-
                 completedBy,
-
                 avgScore,
                 percent,
-
                 employeeScorePercent,
                 coordinatorScorePercent,
             });
         }
 
-        return NextResponse.json({ rows }, { status: 200 });
+        // ✅ COMBINE INTO ONE ROW PER NAME
+        const combinedRows = mergeRowsByName(rows);
+
+        return NextResponse.json({ rows: combinedRows }, { status: 200 });
     } catch (err: any) {
         return NextResponse.json({ error: err?.message ?? "Server error" }, { status: 500 });
     }
