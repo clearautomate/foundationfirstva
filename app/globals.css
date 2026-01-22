@@ -1,3 +1,23 @@
+:root {
+  --color-text: #111827;
+  --color-muted: #6b7280;
+  --color-background: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-muted: #fafafa;
+  --color-border: #e5e7eb;
+  --color-border-strong: #d1d5db;
+  --color-primary: #2563eb;
+  --color-danger: #a40000;
+  --color-danger-bg: #fff2f2;
+  --color-danger-border: #ffcccc;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --shadow-card: 0 6px 16px rgba(0, 0, 0, 0.06);
+  --layout-max-width: 980px;
+  --layout-max-width-narrow: 720px;
+}
+
 html,
 body {
   max-width: 100vw;
@@ -5,15 +25,25 @@ body {
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Poppins;
+  color: var(--color-text);
+  background: var(--color-background);
+  font-family: var(--font-poppins), sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   padding: 0;
   margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
 }

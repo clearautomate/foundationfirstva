@@ -1,5 +1,4 @@
 .container {
-    max-width: 720px;
     margin: 0 auto;
 }
 
@@ -10,11 +9,13 @@
 }
 
 .card {
-    border: 1px solid #ddd;
-    border-radius: 12px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
     padding: 16px;
     display: grid;
     gap: 12px;
+    box-shadow: var(--shadow-card);
 }
 
 .fileGroup {
@@ -31,7 +32,7 @@
 }
 
 .fileName {
-    color: #555;
+    color: var(--color-muted);
 }
 
 .row {
@@ -48,15 +49,16 @@
 .select,
 .input {
     padding: 10px 12px;
-    border-radius: 10px;
-    border: 1px solid #ddd;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border-strong);
+    background: var(--color-surface);
 }
 
 .error {
-    border: 1px solid #ffcccc;
-    background: #fff2f2;
-    color: #a40000;
-    border-radius: 10px;
+    border: 1px solid var(--color-danger-border);
+    background: var(--color-danger-bg);
+    color: var(--color-danger);
+    border-radius: var(--radius-md);
     padding: 10px 12px;
 }
 
@@ -69,15 +71,15 @@
 .button,
 .secondaryButton {
     padding: 10px 14px;
-    border-radius: 10px;
-    border: 1px solid #111;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-text);
     font-weight: 700;
     cursor: pointer;
-    background: white;
+    background: var(--color-surface);
 }
 
 .secondaryButton {
-    border-color: #ddd;
+    border-color: var(--color-border-strong);
     font-weight: 600;
 }
 
