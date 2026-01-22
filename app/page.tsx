@@ -12,6 +12,21 @@ export default function Home() {
     <div className={styles.container}>
       <h1 className={styles.title}>Bonus System Dashboard</h1>
 
+      <div className={styles.logoBar}>
+        <img
+          src="/foundationfirstvalogo.png"
+          alt="Foundation First VA Logo"
+          className={styles.logo}
+        />
+
+        <img
+          src="/clear-automate-logo.png"
+          alt="Clear Automate Logo"
+          className={styles.logo}
+        />
+      </div>
+
+
       {/* Tabs */}
       <div className={styles.tabBar}>
         <button
