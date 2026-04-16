@@ -66,6 +66,10 @@ function setFont(cell: ExcelJS.Cell, font: Partial<ExcelJS.Font>) {
     cell.font = font;
 }
 
+/**
+ * Appends KPI blocks to outWs and returns the addresses of every score cell
+ * (e.g. ["D15", "D24", ...]) so they can be referenced in the Final Score formula.
+ */
 function appendKpiBlocks(args: {
     srcWs: ExcelJS.Worksheet;
     outWs: ExcelJS.Worksheet;
@@ -82,7 +86,7 @@ function appendKpiBlocks(args: {
     centerTopAlign: Partial<ExcelJS.Alignment>;
 
     blackMedBorderStyle: ExcelJS.BorderStyle;
-}) {
+}): { nextRow: number; scoreCellAddresses: string[] } {
     const {
         srcWs,
         outWs,
@@ -97,6 +101,7 @@ function appendKpiBlocks(args: {
     } = args;
 
     let startRow = args.startRow;
+    const scoreCellAddresses: string[] = [];
 
     const labels = [
         "1 – Unsatisfactory",
@@ -165,8 +170,9 @@ function appendKpiBlocks(args: {
         outWs.getCell(startRow + 1, 2).value = competency;
         outWs.getCell(startRow + 1, 3).value = description;
 
-        // Score cell
+        // Score cell — record address for final average formula
         const scoreCell = outWs.getCell(startRow + 1, 4);
+        scoreCellAddresses.push(scoreCell.address);
         scoreCell.value = "";
         setFill(scoreCell, fillYellow);
         setFont(scoreCell, scoreFont);
@@ -212,25 +218,21 @@ function appendKpiBlocks(args: {
             setAlignment(d, { wrapText: true, horizontal: "left", vertical: "middle" });
         }
 
-        // ---- Borders (clean + fixes)
-        // Goals:
-        // 1) Fix missing left border on merged "Rating Scale (1-5)" row
-        // 2) Add a separator line between Question (rows startRow..startRow+1) and Rating Scale (startRow+2..)
-        // 3) Make Notes/Goals wrap only around the Notes/Goals area (rows startRow..startRow+1), not a tall box
+        // ---- Borders (clean + fixes) ----
         const blackMed: Side = { style: blackMedBorderStyle, color: { argb: "FF000000" } };
         const whiteThin: Side = { style: "thin", color: { argb: "FFFFFFFF" } };
 
         const topRow = startRow;
-        const midRow = startRow + 1; // last "question" row
-        const sepRow = startRow + 2; // first "rating scale" row
+        const midRow = startRow + 1;
+        const sepRow = startRow + 2;
         const bottomRow = startRow + 7;
 
-        const mainLeftCol = 2; // B
-        const mainRightCol = 4; // D (main block only)
-        const notesLeftCol = 6; // F
-        const notesRightCol = 7; // G
+        const mainLeftCol = 2;
+        const mainRightCol = 4;
+        const notesLeftCol = 6;
+        const notesRightCol = 7;
 
-        // A) Main block outline only (B..D, rows startRow..startRow+7).
+        // A) Main block outline (B..D, rows startRow..startRow+7)
         for (let rr = topRow; rr <= bottomRow; rr++) {
             for (let cc = mainLeftCol; cc <= mainRightCol; cc++) {
                 const isTop = rr === topRow;
@@ -247,7 +249,7 @@ function appendKpiBlocks(args: {
             }
         }
 
-        // B) Notes/Goals outline only for the first 2 rows (F..G, rows startRow..startRow+1)
+        // B) Notes/Goals outline for the first 2 rows (F..G, rows startRow..startRow+1)
         for (let rr = topRow; rr <= midRow; rr++) {
             for (let cc = notesLeftCol; cc <= notesRightCol; cc++) {
                 const isTop = rr === topRow;
@@ -264,7 +266,7 @@ function appendKpiBlocks(args: {
             }
         }
 
-        // C) Make the cells below Notes/Goals (rows startRow+2..startRow+7) stay "blank/white bordered"
+        // C) Blank/white borders below Notes/Goals area
         for (let rr = sepRow; rr <= bottomRow; rr++) {
             for (let cc = notesLeftCol; cc <= notesRightCol; cc++) {
                 setBorder(outWs.getCell(rr, cc), {
@@ -276,26 +278,20 @@ function appendKpiBlocks(args: {
             }
         }
 
-        // D) Separator line between Question and Rating Scale across the main block (B..D)
-        // Put a medium TOP border on row startRow+2 across B..D.
+        // D) Separator line between Question and Rating Scale (B..D)
         for (let cc = mainLeftCol; cc <= mainRightCol; cc++) {
             const cell = outWs.getCell(sepRow, cc);
             const existing = cell.border ?? {};
-            setBorder(cell, {
-                ...existing,
-                top: blackMed,
-            });
+            setBorder(cell, { ...existing, top: blackMed });
         }
 
-        // E) Fix merged "Rating Scale (1–5)" row left edge by forcing left border on ALL cells in the merged range B..D
-        // (Excel sometimes only displays borders reliably when each underlying cell has the edge set.)
+        // E) Fix merged "Rating Scale (1–5)" row left/right edges
         for (let cc = 2; cc <= 4; cc++) {
             const cell = outWs.getCell(sepRow, cc);
             const existing = cell.border ?? {};
             setBorder(cell, {
                 ...existing,
-                left: blackMed, // ensures the merged row shows a left border
-                // keep right edge correct on D as well
+                left: blackMed,
                 right: cc === 4 ? blackMed : existing.right,
             });
         }
@@ -304,7 +300,115 @@ function appendKpiBlocks(args: {
         startRow += 9;
     }
 
-    return startRow;
+    return { nextRow: startRow, scoreCellAddresses };
+}
+
+/**
+ * Appends a Final Score block that averages all provided score cell addresses.
+ * Visually mirrors a KPI block but is read-only (formula-driven).
+ */
+function appendFinalScoreBlock(args: {
+    outWs: ExcelJS.Worksheet;
+    startRow: number;
+    scoreCellAddresses: string[];
+    boldFont: Partial<ExcelJS.Font>;
+    scoreFont: Partial<ExcelJS.Font>;
+    fillYellow: ExcelJS.Fill;
+    centerAlign: Partial<ExcelJS.Alignment>;
+    centerTopAlign: Partial<ExcelJS.Alignment>;
+    blackMedBorderStyle: ExcelJS.BorderStyle;
+    sectionFont: Partial<ExcelJS.Font>;
+    leftCenterAlign: Partial<ExcelJS.Alignment>;
+}) {
+    const {
+        outWs,
+        scoreCellAddresses,
+        boldFont,
+        scoreFont,
+        fillYellow,
+        centerAlign,
+        centerTopAlign,
+        blackMedBorderStyle,
+        sectionFont,
+        leftCenterAlign,
+    } = args;
+
+    let row = args.startRow;
+
+    const blackMed: Side = { style: blackMedBorderStyle, color: { argb: "FF000000" } };
+    const whiteThin: Side = { style: "thin", color: { argb: "FFFFFFFF" } };
+
+    // Section header
+    outWs.mergeCells(row, 2, row, 4);
+    const secFinal = outWs.getCell(row, 2);
+    secFinal.value = "Final Score";
+    setFont(secFinal, sectionFont);
+    setAlignment(secFinal, leftCenterAlign);
+    row += 2;
+
+    const blockTop = row;
+
+    // Row 1 — column headers
+    outWs.getCell(row, 2).value = "Overall Performance Score";
+    setFont(outWs.getCell(row, 2), boldFont);
+
+    outWs.getCell(row, 3).value = "Average of all KPI & Soft Skill scores";
+    setFont(outWs.getCell(row, 3), boldFont);
+
+    outWs.getCell(row, 4).value = "Final Score (1–5)";
+    setFont(outWs.getCell(row, 4), boldFont);
+    setAlignment(outWs.getCell(row, 4), centerTopAlign);
+
+    row += 1;
+
+    // Row 2 — the formula cell
+    outWs.getCell(row, 2).value = "Calculated automatically from scores above.";
+    setAlignment(outWs.getCell(row, 2), { wrapText: true, horizontal: "left", vertical: "middle" });
+
+    outWs.getCell(row, 3).value = "This score is the mean of all entered KPI scores across Section A and Section B.";
+    setAlignment(outWs.getCell(row, 3), { wrapText: true, horizontal: "left", vertical: "middle" });
+
+    const finalScoreCell = outWs.getCell(row, 4);
+    if (scoreCellAddresses.length > 0) {
+        finalScoreCell.value = {
+            formula: `AVERAGE(${scoreCellAddresses.join(",")})`,
+            result: undefined,
+        };
+    } else {
+        finalScoreCell.value = "N/A";
+    }
+    setFill(finalScoreCell, { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E7E34" } });
+    setFont(finalScoreCell, { size: 20, bold: true, color: { argb: "FFFFFFFF" } });
+    setAlignment(finalScoreCell, centerAlign);
+
+    // Number format: 1 decimal place
+    finalScoreCell.numFmt = "0.0";
+
+    const blockBottom = row;
+
+    // Outline border around the 2-row block (B..D)
+    for (let rr = blockTop; rr <= blockBottom; rr++) {
+        for (let cc = 2; cc <= 4; cc++) {
+            const isTop = rr === blockTop;
+            const isBottom = rr === blockBottom;
+            const isLeft = cc === 2;
+            const isRight = cc === 4;
+
+            setBorder(outWs.getCell(rr, cc), {
+                left: isLeft ? blackMed : whiteThin,
+                right: isRight ? blackMed : whiteThin,
+                top: isTop ? blackMed : whiteThin,
+                bottom: isBottom ? blackMed : whiteThin,
+            });
+        }
+    }
+
+    // Separator between header row and value row
+    for (let cc = 2; cc <= 4; cc++) {
+        const cell = outWs.getCell(blockTop + 1, cc);
+        const existing = cell.border ?? {};
+        setBorder(cell, { ...existing, top: blackMed });
+    }
 }
 
 function buildFormFromSheet(args: {
@@ -348,15 +452,15 @@ function buildFormFromSheet(args: {
     const scoreFont: Partial<ExcelJS.Font> = { size: 20, color: { argb: "FFFF0000" } };
 
     // ---------- Column widths ----------
-    outWs.getColumn(1).width = 3; // A
-    outWs.getColumn(2).width = 50; // B
-    outWs.getColumn(3).width = 70; // C
-    outWs.getColumn(4).width = 16; // D
-    outWs.getColumn(5).width = 3; // E spacer
-    outWs.getColumn(6).width = 40; // F Notes
-    outWs.getColumn(7).width = 40; // G Goals
+    outWs.getColumn(1).width = 3;
+    outWs.getColumn(2).width = 50;
+    outWs.getColumn(3).width = 70;
+    outWs.getColumn(4).width = 16;
+    outWs.getColumn(5).width = 3;
+    outWs.getColumn(6).width = 40;
+    outWs.getColumn(7).width = 40;
 
-    // ---------- Pre-draw white grid (blank/white borders everywhere by default) ----------
+    // ---------- Pre-draw white grid ----------
     for (let r = 1; r <= 600; r++) {
         for (let c = 1; c <= 26; c++) {
             const cell = outWs.getCell(r, c);
@@ -370,7 +474,7 @@ function buildFormFromSheet(args: {
     outWs.getCell("B2").value = `Performance Review Form for ${srcWs.name}`;
     setFont(outWs.getCell("B2"), titleFont);
     setAlignment(outWs.getCell("B2"), centerBottomAlign);
-    outWs.getRow(2).height = 50; // bigger row 2
+    outWs.getRow(2).height = 50;
 
     outWs.mergeCells("B3:D3");
     outWs.getCell("B3").value = "Please rate each question on a scale of 1–5 using the yellow cell.";
@@ -382,12 +486,11 @@ function buildFormFromSheet(args: {
 
     const jobTitle = srcWs.name.endsWith(" KPI") ? srcWs.name.slice(0, -4).trim() : srcWs.name;
 
-    // NEW: "Completed By" row underneath Period (dropdown: Employee/Coordinator)
     const fields: Array<[string, string, boolean, "none" | "role"]> = [
         ["Job Title:", jobTitle, false, "none"],
         ["Fiscal Year:", fiscalYear ?? "", false, "none"],
         ["Period:", periodLabel(reviewType), false, "none"],
-        ["Completed By:", "", true, "role"], // NEW row
+        ["Completed By:", "", true, "role"],
         ["First Name:", "", true, "none"],
         ["Last Name:", "", true, "none"],
     ];
@@ -415,31 +518,27 @@ function buildFormFromSheet(args: {
         setFont(labelCell, boldFont);
         setAlignment(labelCell, rightCenterAlign);
 
-        // merged C:D for header block only
         outWs.mergeCells(r, 3, r, 4);
         const valCell = outWs.getCell(r, 3);
         valCell.value = value;
         setAlignment(valCell, leftVCenterAlign);
 
-        // Yellow input background
         if (isYellow) {
             setFill(valCell, fillYellow);
             setFont(valCell, redFont);
         }
 
-        // Role dropdown
         if (kind === "role") {
-            valCell.value = ""; // keep blank until selected
+            valCell.value = "";
             valCell.dataValidation = completedByValidation;
         }
 
-        // keep borders blank/white inside header block (not "none")
         setBorder(outWs.getCell(r, 2), whiteBorder);
         setBorder(outWs.getCell(r, 3), whiteBorder);
         setBorder(outWs.getCell(r, 4), whiteBorder);
     }
 
-    // outline header block with medium border
+    // outline header block
     for (let r = categoryStart; r <= categoryEnd; r++) {
         for (let c = 2; c <= 4; c++) {
             setBorder(outWs.getCell(r, c), {
@@ -460,10 +559,7 @@ function buildFormFromSheet(args: {
     setAlignment(secA, leftCenterAlign);
     row += 2;
 
-    row = appendKpiBlocks({
-        srcWs,
-        outWs,
-        startRow: row,
+    const kpiBlockArgs = {
         boldFont,
         scoreFont,
         fillYellow,
@@ -472,7 +568,11 @@ function buildFormFromSheet(args: {
         centerAlign,
         centerTopAlign,
         blackMedBorderStyle: blackMedStyle,
-    });
+    };
+
+    const sectionAResult = appendKpiBlocks({ srcWs, outWs, startRow: row, ...kpiBlockArgs });
+    row = sectionAResult.nextRow;
+    const allScoreCellAddresses = [...sectionAResult.scoreCellAddresses];
 
     // ---------- Section B ----------
     row += 1;
@@ -484,20 +584,26 @@ function buildFormFromSheet(args: {
     row += 2;
 
     if (softWs) {
-        appendKpiBlocks({
-            srcWs: softWs,
-            outWs,
-            startRow: row,
-            boldFont,
-            scoreFont,
-            fillYellow,
-            fillLightGray,
-            fillDarkGray,
-            centerAlign,
-            centerTopAlign,
-            blackMedBorderStyle: blackMedStyle,
-        });
+        const sectionBResult = appendKpiBlocks({ srcWs: softWs, outWs, startRow: row, ...kpiBlockArgs });
+        row = sectionBResult.nextRow;
+        allScoreCellAddresses.push(...sectionBResult.scoreCellAddresses);
     }
+
+    // ---------- Final Score ----------
+    row += 1;
+    appendFinalScoreBlock({
+        outWs,
+        startRow: row,
+        scoreCellAddresses: allScoreCellAddresses,
+        boldFont,
+        scoreFont,
+        fillYellow,
+        centerAlign,
+        centerTopAlign,
+        blackMedBorderStyle: blackMedStyle,
+        sectionFont,
+        leftCenterAlign,
+    });
 }
 
 export async function POST(req: Request) {
@@ -517,7 +623,6 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "File must be .xlsx" }, { status: 400 });
         }
 
-        // Avoid Node22 Buffer<T> mismatch by using Uint8Array
         const ab = await file.arrayBuffer();
         const inputBytes: Uint8Array = new Uint8Array(ab);
 
