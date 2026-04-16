@@ -371,7 +371,7 @@ function appendFinalScoreBlock(args: {
     const finalScoreCell = outWs.getCell(row, 4);
     if (scoreCellAddresses.length > 0) {
         finalScoreCell.value = {
-            formula: `AVERAGE(${scoreCellAddresses.join(",")})`,
+            formula: `AVERAGE(${scoreCellAddresses.join(",")}) / 5`,
             result: undefined,
         };
     } else {
@@ -382,7 +382,7 @@ function appendFinalScoreBlock(args: {
     setAlignment(finalScoreCell, centerAlign);
 
     // Number format: 1 decimal place
-    finalScoreCell.numFmt = "0.0";
+    finalScoreCell.numFmt = "0.0%";
 
     const blockBottom = row;
 
